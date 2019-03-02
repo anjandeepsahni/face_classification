@@ -1,0 +1,79 @@
+import os
+#import cv2
+import numpy as np
+import json
+import torch
+from PIL import Image
+from torch.utils.data import Dataset as Dataset
+
+FACE_CLFN_TRAIN_DATA = './../Data/train_data/medium'
+FACE_CLFN_VAL_DATA = './../Data/validation_classification/medium'
+FACE_CLFN_TEST_DATA = './../Data/test_classification/medium'
+DUMPED_DATA_ROOT = './../Data/dumped'
+
+class FaceClassificationDataset(Dataset):
+    def __init__(self, num_classes, mode='train'):
+        # Check for valid mode.
+        self.mode = mode
+        self.num_classes = num_classes
+        valid_modes = {'train', 'val', 'test'}
+        if self.mode not in valid_modes:
+            raise ValueError("FaceClassificationDataset Error: Mode must be one of %r." % valid_modes)
+        # Path where data and labels tensor will be dumped/loaded to/from.
+        self.dataDumpPath = os.path.join(DUMPED_DATA_ROOT, '{}.json'.format(self.mode))
+        self.labelsDumpPath = os.path.join(DUMPED_DATA_ROOT, '{}_labels.json'.format(self.mode))
+        if self.mode == 'train':
+            self.data_dir = FACE_CLFN_TRAIN_DATA
+        elif self.mode =='val':
+            self.data_dir = FACE_CLFN_VAL_DATA
+        else:
+            self.data_dir = FACE_CLFN_TEST_DATA
+        # Check if we already have previously dumped tensor data.
+        if os.path.isfile(self.dataDumpPath):
+            with open(self.dataDumpPath, 'r') as infile:
+                self.data = json.load(infile)
+            # If data json exists then labels MUST exist for train and val modes.
+            if self.mode != 'test':
+                if os.path.isfile(self.labelsDumpPath):
+                    with open(self.labelsDumpPath, 'r') as infile:
+                        self.labels = json.load(infile)
+                else:
+                    raise ValueError("FaceClassificationDataset Error: Data JSON file found at %s but labels JSON file missing at %s." \
+                        % (self.dataDumpPath, self.labelsDumpPath))
+        else:
+            # Load the data and labels (labels = empty for 'test' mode)
+            self.data = []
+            self.labels = []
+            if self.mode != 'test':
+                # In case of train and val, we have class folders and multiple images for each class.
+                classes = sorted([int(dir) for dir in os.listdir(self.data_dir) if os.path.isdir(os.path.join(self.data_dir, dir))])
+                classes = [str(class_id) for class_id in classes]
+                for dir in classes:
+                    #print('Loop : %d' % (int(dir)))
+                    class_path = os.path.join(self.data_dir, dir)
+                    image_files = sorted([os.path.join(dir,file) for file in os.listdir(class_path) if os.path.isfile(os.path.join(class_path, file))])
+                    self.data.extend(image_files)
+                    class_id = [int(dir)] * len(image_files)
+                    self.labels.extend(class_id)
+            else:
+                # In case of test, there is no class folder, directly image files.
+                self.data = [file for file in os.listdir(self.data_dir) if os.path.isfile(os.path.join(self.data_dir, file))]
+            # Dump data and labels tensor so we don't have to create again.
+            with open(self.dataDumpPath, 'w') as outfile:
+                json.dump(self.data, outfile)
+            if self.mode != 'test':
+                with open(self.labelsDumpPath, 'w') as outfile:
+                    json.dump(self.labels, outfile)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        img_path = os.path.join(self.data_dir, self.data[idx])
+        img = np.array(Image.open(img_path))
+        img = torch.from_numpy(img).float().view(img.shape[2], img.shape[0], img.shape[1])
+        if self.mode == 'test':
+            return img
+        else:
+            label = self.labels[idx]
+            return img, label
