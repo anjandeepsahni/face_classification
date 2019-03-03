@@ -58,7 +58,8 @@ class FaceClassificationDataset(Dataset):
                     self.labels.extend(class_id)
             else:
                 # In case of test, there is no class folder, directly image files.
-                self.data = [file for file in os.listdir(self.data_dir) if os.path.isfile(os.path.join(self.data_dir, file))]
+                self.data = sorted([int(file.split('.jpg')[0]) for file in os.listdir(self.data_dir) if os.path.isfile(os.path.join(self.data_dir, file))])
+                self.data = [(str(file) + ".jpg") for file in self.data]
             # Dump data and labels tensor so we don't have to create again.
             with open(self.dataDumpPath, 'w') as outfile:
                 json.dump(self.data, outfile)
