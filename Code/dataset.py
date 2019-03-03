@@ -4,6 +4,7 @@ import numpy as np
 import json
 import torch
 from PIL import Image
+import torchvision
 from torch.utils.data import Dataset as Dataset
 
 FACE_CLFN_TRAIN_DATA = './../Data/train_data/medium'
@@ -70,8 +71,8 @@ class FaceClassificationDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path = os.path.join(self.data_dir, self.data[idx])
-        img = np.array(Image.open(img_path))
-        img = torch.from_numpy(img).float().view(img.shape[2], img.shape[0], img.shape[1])
+        img = Image.open(img_path)
+        img = torchvision.transforms.ToTensor()(img)
         if self.mode == 'test':
             return img
         else:

@@ -4,8 +4,10 @@ import time
 import torch
 import argparse
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from model import FaceClassifier
+from model import CenterLoss
 from torch.utils.data import DataLoader
 from dataset import FaceClassificationDataset
 
@@ -20,9 +22,11 @@ DEFAULT_TEST_BATCH_SIZE = 128
 DEFAULT_NUM_CLASSES = 2300
 
 # Hyperparameters.
-LEARNING_RATE = 0.02
+LEARNING_RATE = 1e-2
+LEARNING_RATE_CENTER = 0.5
 LEARNING_RATE_STEP = 0.7
 WEIGHT_DECAY = 5e-5
+CLOSS_WEIGHT = 1
 
 def init_weights(m):
     if type(m) == nn.Conv2d or type(m) == nn.Linear:
@@ -60,6 +64,34 @@ def train_model(model, train_loader, criterion, optimizer, device):
     print('\nTraining Loss: %5.4f Time: %d s' % (running_loss, end_time - start_time))
     return running_loss
 
+def train_model_closs(model, train_loader, criterion_label, criterion_closs, optimizer_label, optimizer_closs, device):
+    model.train()
+    model.to(device)
+    running_loss = 0.0
+    start_time = time.time()
+    for batch_idx, (data, target) in enumerate(train_loader):
+        optimizer_label.zero_grad()
+        optimizer_closs.zero_grad()
+        data, target = data.to(device), target.to(device)
+        features, outputs = model(data)
+        l_loss = criterion_label(outputs, target.long())
+        c_loss = criterion_closs(features, target.long())
+        loss = l_loss + CLOSS_WEIGHT * c_loss
+        loss.backward()
+        optimizer_label.step()
+       # by doing so, weight_cent would not impact on the learning of centers
+        for param in criterion_closs.parameters():
+            param.grad.data *= (1. / CLOSS_WEIGHT)
+        optimizer_closs.step()
+        running_loss += loss.item()
+        print('Train Iteration: %d/%d Loss = %5.4f' % \
+                (batch_idx+1, len(train_loader), (running_loss/(batch_idx+1))), \
+                end="\r", flush=True)
+    end_time = time.time()
+    running_loss /= len(train_loader)
+    print('\nTraining Loss: %5.4f Time: %d s' % (running_loss, end_time - start_time))
+    return running_loss
+
 def val_model(model, val_loader, criterion, device):
     with torch.no_grad():
         model.eval()
@@ -71,9 +103,11 @@ def val_model(model, val_loader, criterion, device):
         for batch_idx, (data, target) in enumerate(val_loader):
             data, target = data.to(device), target.long().to(device)
             outputs = model(data)[1]    # Only pick label output.
-            _, predicted = torch.max(outputs.data, 1)
+            #_, predicted = torch.max(outputs.data, 1)
+            _, predicted = torch.max(F.softmax(outputs, dim=1), 1)
+            predicted = predicted.view(-1)
             total_predictions += target.size(0)
-            correct_predictions += (predicted == target).sum().item()
+            correct_predictions += torch.sum(torch.eq(predicted, target)).item()
             loss = criterion(outputs, target)
             running_loss += loss.item()
             print('Validation Iteration: %d/%d Loss = %5.4f' % \
@@ -81,7 +115,36 @@ def val_model(model, val_loader, criterion, device):
                     end="\r", flush=True)
         end_time = time.time()
         running_loss /= len(val_loader)
-        print('correct_predictions= %d, total_predictions = %d' % (correct_predictions, total_predictions))
+        acc = (correct_predictions/total_predictions)*100.0
+        print('\nValidation Loss: %5.4f Validation Accuracy: %5.3f Time: %d s' % \
+                (running_loss, acc, end_time - start_time))
+        return running_loss, acc
+
+def val_model_closs(model, val_loader, criterion_label, criterion_closs, device):
+    with torch.no_grad():
+        model.eval()
+        model.to(device)
+        running_loss = 0.0
+        total_predictions = 0.0
+        correct_predictions = 0.0
+        start_time = time.time()
+        for batch_idx, (data, target) in enumerate(val_loader):
+            data, target = data.to(device), target.long().to(device)
+            features, outputs = model(data)
+            #_, predicted = torch.max(outputs.data, 1)
+            _, predicted = torch.max(F.softmax(outputs, dim=1), 1)
+            predicted = predicted.view(-1)
+            total_predictions += target.size(0)
+            correct_predictions += torch.sum(torch.eq(predicted, target)).item()
+            l_loss = criterion_label(outputs, target)
+            c_loss = criterion_closs(features, target)
+            loss = l_loss + CLOSS_WEIGHT * c_loss
+            running_loss += loss.item()
+            print('Validation Iteration: %d/%d Loss = %5.4f' % \
+                    (batch_idx+1, len(val_loader), (running_loss/(batch_idx+1))), \
+                    end="\r", flush=True)
+        end_time = time.time()
+        running_loss /= len(val_loader)
         acc = (correct_predictions/total_predictions)*100.0
         print('\nValidation Loss: %5.4f Validation Accuracy: %5.3f Time: %d s' % \
                 (running_loss, acc, end_time - start_time))
@@ -141,19 +204,24 @@ if __name__ == "__main__":
     test_loader = DataLoader(faceTestDataset, batch_size=args.test_batch_size,
                         shuffle=False, num_workers=8)
 
-
-    model_hiddens = [32, 64, 128, 256, 512]
-    model_input_feat = 3    # Num of channels.
     model_num_classes = faceTrainDataset.num_classes
-    model = FaceClassifier(model_input_feat, model_hiddens, model_num_classes)
-    criterion = nn.CrossEntropyLoss()
+    model = FaceClassifier(model_num_classes)
     print('='*20)
     print(model)
+    model_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print('Total Model Parameters:', model_total_params)
 
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma = LEARNING_RATE_STEP)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Running on device = %s." % (device))
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma = LEARNING_RATE_STEP)
+
+    #criterion_label = nn.CrossEntropyLoss()
+    #criterion_closs = CenterLoss(model_num_classes, 10, device)
+    #optimizer_label = optim.SGD(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY, momentum=0.9)
+    #optimizer_closs = optim.SGD(criterion_closs.parameters(), lr=LEARNING_RATE_CENTER)
 
     if args.reload_model:
         model.load_state_dict(torch.load(args.model_path, map_location=device))
@@ -172,7 +240,9 @@ if __name__ == "__main__":
         for i in range(n_epochs):
             print('Epoch: %d/%d' % (i+1,n_epochs))
             train_loss = train_model(model, train_loader, criterion, optimizer, device)
+            #train_loss = train_model_closs(model, train_loader, criterion_label, criterion_closs, optimizer_label, optimizer_closs, device)
             val_loss, val_acc = val_model(model, val_loader, criterion, device)
+            #val_loss, val_acc = val_model_closs(model, val_loader, criterion_label, criterion_closs, device)
             Train_loss.append(train_loss)
             Val_loss.append(val_loss)
             Val_acc.append(val_acc)
