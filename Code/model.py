@@ -94,6 +94,12 @@ class FaceClassifier(nn.Module):
         self.res_expfact = [1, 6, 6, 6]
         self.res_repeat = [1, 3, 5, 7]
         self.res_stride = [1, 2, 2, 2]
+        #self.conv_channels = [16, 32]
+        #self.res_channels = [16, 24, 32, 64, 96, 160, 320]
+        #self.res_channels = [16, 24, 32, 64, 96, 160, 320]
+        #self.res_expfact = [1, 6, 6, 6, 6, 6, 6]
+        #self.res_repeat = [1, 2, 3, 4, 3, 3, 1]
+        #self.res_stride = [1, 2, 1, 2, 1, 2, 1]
         self.layers = []
         # Prepare the model.
         insize = self.infeat
