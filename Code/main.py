@@ -27,6 +27,7 @@ LEARNING_RATE_CENTER = 0.5
 LEARNING_RATE_STEP = 0.7
 WEIGHT_DECAY = 5e-5
 CLOSS_WEIGHT = 1
+WARM_UP_EPOCHS = 5
 
 def init_weights(m):
     if type(m) == nn.Conv2d or type(m) == nn.Linear:
@@ -169,6 +170,25 @@ def test_model(model, test_loader, device):
         end_time = time.time()
         print('\nTotal Test Predictions: %d Time: %d s' % (all_predictions.size()[0], end_time - start_time))
 
+def test_model_verification(model, test_loader, device):
+    with torch.no_grad():
+        model.eval()
+        model.to(device)
+        start_time = time.time()
+        all_predictions = []
+        for batch_idx, data in enumerate(test_loader):
+            data = data.to(device)
+            outputs = model(data)[0]    # Only pick label output.
+            _, predicted = torch.max(outputs.data, 1)
+            all_predictions.append(predicted)
+            print('Test Iteration: %d/%d' % (batch_idx+1, len(test_loader)), end="\r", flush=True)
+        # Join list of predicted tensors.
+        all_predictions = torch.cat(all_predictions, 0)
+        # Save predictions in csv file.
+        save_test_results(all_predictions)
+        end_time = time.time()
+        print('\nTotal Test Predictions: %d Time: %d s' % (all_predictions.size()[0], end_time - start_time))
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Training/testing for Face Classifier.')
     parser.add_argument('--mode', type=str, choices=['train', 'test'], default=DEFAULT_RUN_MODE, help='\'train\' or \'test\' mode.')
@@ -251,7 +271,8 @@ if __name__ == "__main__":
             model_path = os.path.join(MODEL_PATH, 'model_{}_val_{}.pt'.format(time.strftime("%Y%m%d-%H%M%S"), finalValAcc))
             torch.save(model.state_dict(), model_path)
             print('='*20)
-            scheduler.step()
+            if i >= WARM_UP_EPOCHS:
+                scheduler.step()
     else:
         # Only testing the model.
         test_model(model, test_loader, device)

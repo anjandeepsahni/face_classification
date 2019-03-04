@@ -90,9 +90,9 @@ class FaceClassifier(nn.Module):
         super(FaceClassifier, self).__init__()
         self.infeat = 3 # Num of input channels.
         self.conv_channels = [16, 32]
-        self.res_channels = [16, 24, 32, 64]
+        self.res_channels = [16, 32, 64, 128]
         self.res_expfact = [1, 6, 6, 6]
-        self.res_repeat = [1, 2, 3, 4]
+        self.res_repeat = [1, 3, 5, 7]
         self.res_stride = [1, 2, 2, 2]
         self.layers = []
         # Prepare the model.
