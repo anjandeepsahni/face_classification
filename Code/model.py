@@ -50,63 +50,40 @@ class InvertedResidualBottleneck(nn.Module):
         else:
             return self.block(x)
 
-class FaceClassifier2(nn.Module):
-    def __init__(self, num_feat, hidden_sizes, num_classes, feat_dim=10):
-        super(FaceClassifier, self).__init__()
-        self.hidden_sizes = [num_feat] + hidden_sizes + [num_classes]
-        self.layers = []
-        for idx, channel_size in enumerate(hidden_sizes):
-            self.layers.append(nn.Conv2d(in_channels=self.hidden_sizes[idx],
-                                        out_channels=self.hidden_sizes[idx+1],
-                                        kernel_size=2, stride=2, bias=False))
-            self.layers.append(nn.ReLU(inplace=True))
-            self.layers.append(ResBlock(channel_size=channel_size))
-        self.layers = nn.Sequential(*self.layers)
-        self.linear_label = nn.Linear(in_features=self.hidden_sizes[-2], out_features=self.hidden_sizes[-1], bias=False)
-
-        # Creating embedding for face verification task.
-        self.linear_closs = nn.Linear(in_features=self.hidden_sizes[-2], out_features=feat_dim, bias=False)
-        self.relu_closs = nn.ReLU(inplace=True)
-
-    def forward(self,x):
-        out = x
-        out = self.layers(x)
-        # Pooling before fully connected layer to reduce params.
-        out = F.avg_pool2d(out, [out.size(2), out.size(3)], stride=1)
-        out = out.reshape(out.shape[0], out.shape[1])
-
-        # Fully Connected.
-        label_out = self.linear_label(out)
-        label_out = label_out/torch.norm(self.linear_label.weight, dim=1)   # Normalize to keep between [0,1] for embedding.
-
-        # Embedding.
-        closs_out = self.linear_closs(out)
-        closs_out = self.relu_closs(closs_out)
-
-        return closs_out, label_out
-
 class FaceClassifier(nn.Module):
     def __init__(self, num_classes, feat_dim=10):
         super(FaceClassifier, self).__init__()
         self.infeat = 3 # Num of input channels.
+        self.feat_dim = feat_dim
         self.conv_channels = [16, 32]
         self.res_channels = [16, 32, 64, 128]
         self.res_expfact = [1, 6, 6, 6]
         self.res_repeat = [1, 3, 5, 7]
         self.res_stride = [1, 2, 2, 2]
-        #self.conv_channels = [16, 32]
+
+        #self.res_channels = [16, 24, 32, 64]
+        #self.res_expfact = [2, 6, 8, 10]
+        #self.res_repeat = [1, 3, 5, 3]
+
+        #self.res_channels = [16, 32, 64, 128, 512, 1024]
+        #self.res_expfact = [1, 6, 6, 6, 6, 2]
+        #self.res_repeat = [1, 3, 3, 3, 1, 1]
+        #self.res_stride = [1, 2, 2, 2, 2, 2]
+        #self.conv_channels_out = [512]
+
+        #self.conv_channels = [32]
         #self.res_channels = [16, 24, 32, 64, 96, 160, 320]
         #self.res_channels = [16, 24, 32, 64, 96, 160, 320]
         #self.res_expfact = [1, 6, 6, 6, 6, 6, 6]
         #self.res_repeat = [1, 2, 3, 4, 3, 3, 1]
         #self.res_stride = [1, 2, 1, 2, 1, 2, 1]
+
         self.layers = []
         # Prepare the model.
         insize = self.infeat
         for outsize in self.conv_channels:
             self.layers += [nn.Conv2d(in_channels=insize, out_channels=outsize, kernel_size=3, stride=1, bias=False)]
-            self.layers += [nn.BatchNorm2d(num_features=outsize)]
-            self.layers += [nn.ReLU6(inplace=True)]
+            self.layers += [nn.BatchNorm2d(num_features=outsize), nn.ReLU6(inplace=True)]
             insize = outsize
         for idx, outsize in enumerate(self.res_channels):
             for n in range(self.res_repeat[idx]):
@@ -117,12 +94,20 @@ class FaceClassifier(nn.Module):
                 else:
                     self.layers += [InvertedResidualBottleneck(insize=insize, outsize=outsize,
                                                                 stride=1, expfact=self.res_expfact[idx])]
+        # Final few conv layers to increase number of feature maps. Must be at least 4x4 here.
+        #insize = self.res_channels[-1]
+        #for outsize in self.conv_channels_out:
+        #    self.layers += [nn.Conv2d(in_channels=insize, out_channels=outsize, kernel_size=2, stride=1, bias=False)]
+        #    self.layers += [nn.BatchNorm2d(num_features=outsize), nn.ReLU6(inplace=True)]
+        #    insize = outsize
         self.layers = nn.Sequential(*self.layers)
+        #self.linear_label = nn.Linear(in_features=self.conv_channels_out[-1], out_features=num_classes, bias=False)
         self.linear_label = nn.Linear(in_features=self.res_channels[-1], out_features=num_classes, bias=False)
 
         # Creating embedding for face verification task.
+        #self.linear_closs = nn.Linear(in_features=self.conv_channels_out[-1], out_features=self.feat_dim, bias=False)
         self.linear_closs = nn.Linear(in_features=self.res_channels[-1], out_features=feat_dim, bias=False)
-        self.relu_closs = nn.ReLU(inplace=True)
+        #self.relu_closs = nn.ReLU(inplace=True)
 
     def forward(self,x):
         out = x
@@ -137,7 +122,7 @@ class FaceClassifier(nn.Module):
 
         # Embedding.
         closs_out = self.linear_closs(out)
-        closs_out = self.relu_closs(closs_out)
+        #closs_out = self.relu_closs(closs_out)
 
         return closs_out, label_out
 
