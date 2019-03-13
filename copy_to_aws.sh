@@ -1,7 +1,8 @@
-#scp -v -i "~/Documents/Do Not Touch/aws_key.pem" -r "/Users/sahni/Downloads/test_trials_verification_student_new.txt" ubuntu@ec2-3-16-180-109.us-east-2.compute.amazonaws.com:~/sahni/HW2P2/Data/
-scp -v -i "~/Documents/Do Not Touch/aws_key.pem" -r "/Users/sahni/Documents/Code/github_repos/CMUCourseWork/11785/HW2-Part2/Code/dataset.py" ubuntu@ec2-3-16-180-109.us-east-2.compute.amazonaws.com:~/sahni/HW2P2/Code/
-scp -v -i "~/Documents/Do Not Touch/aws_key.pem" -r "/Users/sahni/Documents/Code/github_repos/CMUCourseWork/11785/HW2-Part2/Code/main.py" ubuntu@ec2-3-16-180-109.us-east-2.compute.amazonaws.com:~/sahni/HW2P2/Code/
-scp -v -i "~/Documents/Do Not Touch/aws_key.pem" -r "/Users/sahni/Documents/Code/github_repos/CMUCourseWork/11785/HW2-Part2/Code/model.py" ubuntu@ec2-3-16-180-109.us-east-2.compute.amazonaws.com:~/sahni/HW2P2/Code/
+#scp -v -i "~/Documents/Do Not Touch/aws_key.pem" -r "/Users/sahni/Downloads/test_trials_verification_student_new.txt" ubuntu@ec2-18-224-170-60.us-east-2.compute.amazonaws.com:~/sahni/HW2P2/Data/
+#scp -v -i "~/Documents/Do Not Touch/aws_key.pem" -r "/Users/sahni/Documents/Code/github_repos/CMUCourseWork/11785/HW2-Part2/Data/dumped/zca_matrix.pt" ubuntu@ec2-18-224-170-60.us-east-2.compute.amazonaws.com:~/sahni/HW2P2/Data/dumped
+scp -v -i "~/Documents/Do Not Touch/aws_key.pem" -r "/Users/sahni/Documents/Code/github_repos/CMUCourseWork/11785/HW2-Part2/Code/dataset.py" ubuntu@ec2-18-224-170-60.us-east-2.compute.amazonaws.com:~/sahni/HW2P2/Code/
+scp -v -i "~/Documents/Do Not Touch/aws_key.pem" -r "/Users/sahni/Documents/Code/github_repos/CMUCourseWork/11785/HW2-Part2/Code/main.py" ubuntu@ec2-18-224-170-60.us-east-2.compute.amazonaws.com:~/sahni/HW2P2/Code/
+scp -v -i "~/Documents/Do Not Touch/aws_key.pem" -r "/Users/sahni/Documents/Code/github_repos/CMUCourseWork/11785/HW2-Part2/Code/model.py" ubuntu@ec2-18-224-170-60.us-east-2.compute.amazonaws.com:~/sahni/HW2P2/Code/
 
 # Copy Dataset Onetime Only.
 #scp -v -i "~/Documents/Do Not Touch/aws_key.pem" -r "/Users/sahni/Documents/Code/github_repos/CMUCourseWork/11785/HW1-Part2/Data/dev.pt" ubuntu@ec2-3-17-172-51.us-east-2.compute.amazonaws.com:~/sahni/HW1-Part2/Data/

@@ -2,6 +2,7 @@ import os
 import numpy as np
 import json
 import torch
+import random
 from PIL import Image
 import torchvision
 from torch.utils.data import Dataset as Dataset
