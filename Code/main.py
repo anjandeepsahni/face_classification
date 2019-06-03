@@ -3,14 +3,14 @@ import csv
 import time
 import torch
 import argparse
-import torch.nn as nn
-from sklearn.metrics import roc_auc_score
-import torch.nn.functional as F
-import torch.optim as optim
 from model import *
-from torch.utils.data import DataLoader
 from dataset import *
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
 from torchsummary import summary
+from sklearn.metrics import roc_auc_score
+from torch.utils.data import DataLoader
 
 # Paths
 MODEL_PATH = './../Models'
@@ -56,10 +56,12 @@ RESNET50_W3 = './../Models/model_20190308-005346_val_65.290.pt'
 RESNET50_W4 = './../Models/model_20190308-010639_val_65.486.pt'
 RESNET50_W5 = './../Models/model_20190308-011932_val_64.899.pt'
 
+# Initialize weights using xavier initialization.
 def init_weights(m):
     if type(m) == nn.Conv2d or type(m) == nn.Linear:
         torch.nn.init.xavier_normal_(m.weight.data)
 
+# Saves test results to csv file for kaggle submission.
 def save_test_results(predictions, ensemble=False):
     predictions = list(predictions.cpu().numpy())
     predictions_count = list(range(len(predictions)))
@@ -75,6 +77,7 @@ def save_test_results(predictions, ensemble=False):
         csv_writer.writerow(['id', 'label'])
         csv_writer.writerows(csv_output)
 
+# Saves test results to csv file for kaggle submission (for face verification).
 def save_test_verification_results(predictions, ensemble=False):
     predictions = list(predictions.cpu().numpy())
     with open(TEST_VRFN_FILE) as test_file:
@@ -361,8 +364,6 @@ def load_weights(model, model_path, device):
     print('Skipped %d/%d params from pretrained for %d params in model.' \
             % (len(bad_keys), pretrained_params, model_params))
     return model
-
-
 
 if __name__ == "__main__":
     # Create arg parser.

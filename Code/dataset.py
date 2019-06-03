@@ -1,10 +1,10 @@
 import os
-import numpy as np
 import json
 import torch
 import random
-from PIL import Image
 import torchvision
+import numpy as np
+from PIL import Image
 from torch.utils.data import Dataset as Dataset
 
 FACE_CLFN_TRAIN_DATA = './../Data/train_data/medium'

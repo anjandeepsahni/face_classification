@@ -88,7 +88,7 @@ class InvResBottleneck(nn.Module):
 
 # Resnet50
 class Resnet50(nn.Module):
-    def __init__(self, num_classes, feat_dim=20):
+    def __init__(self, num_classes):
         super(Resnet50, self).__init__()
         # Initial conv layer and maxpool.
         # Kernel size changed from 7->6 and stride from 2->1
@@ -122,9 +122,6 @@ class Resnet50(nn.Module):
         self.layers = nn.Sequential(*self.layers)
         # Fully connected.
         self.linear_label = nn.Linear(in_features=(self.res_channels[-1]*self.res_expfact[-1]), out_features=num_classes, bias=False)
-        # Creating embedding for face verification task.
-        self.linear_embed = nn.Linear(in_features=(self.res_channels[-1]*self.res_expfact[-1]), out_features=feat_dim, bias=False)
-        self.relu_embed = nn.ReLU(inplace=True)
 
     def forward(self, x):
         out = x
@@ -135,17 +132,14 @@ class Resnet50(nn.Module):
         # Fully Connected.
         label_out = self.linear_label(out)
         label_out = label_out/torch.norm(self.linear_label.weight, dim=1)   # Normalize to keep between [0,1] for embedding.
-        # Embedding.
-        embed_out = self.linear_embed(out)
-        embed_out = self.relu_embed(embed_out)
-        # Feat_dim=20 is too small, hence returning the last conv layer as flattened.
+        # Return flattened final conv layer for verification.
+        # Return output of linear layer for classification.
         return out, label_out
 
 class MobileNetV2_v1(nn.Module):
-    def __init__(self, num_classes, feat_dim=10):
+    def __init__(self, num_classes):
         super(MobileNetV2_v1, self).__init__()
         self.infeat = 3 # Num of input channels.
-        self.feat_dim = feat_dim
         self.conv_channels = [16, 32]
         self.res_channels = [16, 32, 64, 128]
         self.res_expfact = [1, 6, 6, 6]
@@ -169,11 +163,6 @@ class MobileNetV2_v1(nn.Module):
                     self.layers += [InvResBottleneck(insize=insize, outsize=outsize,
                                                                 stride=1, expfact=self.res_expfact[idx])]
         self.layers = nn.Sequential(*self.layers)
-
-        # Embedding layer.
-        self.linear_closs = nn.Linear(in_features=self.res_channels[-1], out_features=feat_dim, bias=False)
-        self.relu_closs = nn.ReLU(inplace=True)
-
         # Final label layer.
         self.linear_label = nn.Linear(in_features=self.res_channels[-1], out_features=num_classes, bias=False)
 
@@ -182,19 +171,17 @@ class MobileNetV2_v1(nn.Module):
         # Pooling before fully connected layer to reduce params.
         out = F.avg_pool2d(out, [out.size(2), out.size(3)], stride=1)
         out = out.reshape(out.shape[0], out.shape[1])
-        # Fully Connected - Embedding.
-        embed_out = self.linear_closs(out)
-        embed_out = self.relu_closs(embed_out)
         # Fully Connected - Labels.
         label_out = self.linear_label(out)
         label_out = label_out/torch.norm(self.linear_label.weight, dim=1)   # Normalize to keep between [0,1] for embedding.
-        # Feat_dim=10 is too small, hence returning the last conv layer as flattened.
+        # Return flattened final conv layer for verification.
+        # Return output of linear layer for classification.
         return out, label_out
 
 class MobileNetV2_v2(nn.Module):
     def __init__(self, num_classes, feat_dim=256):
         super(MobileNetV2_v2, self).__init__()
-        self.infeat = 3 # Num of input channels.
+        self.infeat = 3     # Num of input channels.
         self.feat_dim = feat_dim
         self.conv_channels = [16, 32]
         self.res_channels = [16, 32, 64, 128]
